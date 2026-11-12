@@ -13,8 +13,12 @@
 
 namespace VideoCommon {
 
-inline constexpr u32 OpenGLPipelineCacheVersion = 46;
-inline constexpr u32 VulkanPipelineCacheVersion = 50;
+// 146/150: the record layout of 46/50 plus, after the program header of a task or mesh
+// environment, its three mesh registers and the 0x50 byte mesh primitive header, so task/mesh
+// pipelines can be stored. The numbers stay clear of upstream Lichii's (its 51-54 have other
+// layouts and share this directory), so neither build reads the other's files.
+inline constexpr u32 OpenGLPipelineCacheVersion = 146;
+inline constexpr u32 VulkanPipelineCacheVersion = 150;
 
 // Official Eglantine (cache version 18 at c0cb3325) and this fork (a different version) both
 // used <shader dir>/<title>/vulkan.bin and vulkan_pipelines.bin. Each build deletes a file

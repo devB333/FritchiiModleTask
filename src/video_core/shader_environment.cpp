@@ -318,6 +318,13 @@ void GenericEnvironment::Serialize(std::ofstream& file) const {
             file.write(reinterpret_cast<const char*>(&gp_passthrough_mask),
                        sizeof(gp_passthrough_mask));
         }
+        // Task and mesh programs are translated with these (see TranslateProgram), so a cached
+        // pipeline needs them to be rebuilt at boot.
+        if (stage == Shader::Stage::Task || stage == Shader::Stage::Mesh) {
+            file.write(reinterpret_cast<const char*>(&mesh_registers), sizeof(mesh_registers))
+                .write(reinterpret_cast<const char*>(&mesh_primitive_header),
+                       sizeof(mesh_primitive_header));
+        }
     }
 }
 
@@ -1074,6 +1081,11 @@ void FileEnvironment::Deserialize(std::ifstream& file) {
         initial_offset = sizeof(sph);
         if (stage == Shader::Stage::Geometry) {
             file.read(reinterpret_cast<char*>(&gp_passthrough_mask), sizeof(gp_passthrough_mask));
+        }
+        if (stage == Shader::Stage::Task || stage == Shader::Stage::Mesh) {
+            file.read(reinterpret_cast<char*>(&mesh_registers), sizeof(mesh_registers))
+                .read(reinterpret_cast<char*>(&mesh_primitive_header),
+                      sizeof(mesh_primitive_header));
         }
     }
     // Native programs fold bank 1 reads as they did when they were built.
