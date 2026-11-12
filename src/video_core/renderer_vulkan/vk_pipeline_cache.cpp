@@ -794,6 +794,9 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
         size_t built{};
         bool has_loaded{};
         std::unique_ptr<PipelineStatistics> statistics;
+        /// Records whose pipeline could not be built (for example a value the translation reads
+        /// is not in the record).
+        std::vector<GraphicsPipelineCacheKey> failed;
     } state;
 
     if (device.IsKhrPipelineExecutablePropertiesEnabled()) {
@@ -880,6 +883,8 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
             std::scoped_lock lock{state.mutex};
             if (pipeline) {
                 graphics_cache.emplace(key, std::move(pipeline));
+            } else {
+                state.failed.push_back(key);
             }
             ++state.built;
             if (state.has_loaded) {
@@ -904,6 +909,25 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
     lock.unlock();
 
     workers.WaitForRequests(stop_loading);
+
+    // A record that cannot be built is as good as absent: forget it, so the pipeline is stored
+    // again (with everything this build's translation reads) when the game builds it. Otherwise
+    // it would fail at every boot and be rebuilt at runtime in every session.
+    {
+        std::scoped_lock failed_lock{state.mutex};
+        size_t forgotten{};
+        for (const GraphicsPipelineCacheKey& key : state.failed) {
+            if (!graphics_cache.contains(key)) {
+                forgotten += disk_pipelines.erase(key.Hash());
+            }
+        }
+        if (forgotten != 0) {
+            LOG_WARNING(Render_Vulkan,
+                        "{} cached graphics pipelines could not be built and are stored again "
+                        "when the game builds them",
+                        forgotten);
+        }
+    }
 
     if (use_vulkan_pipeline_cache) {
         SerializeVulkanPipelineCache(vulkan_pipeline_cache_filename, vulkan_pipeline_cache,
